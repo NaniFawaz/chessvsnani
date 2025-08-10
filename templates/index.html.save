@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chess vs Nani</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboardjs/1.0.0/chessboard-1.0.0.min.css" />
+  <style>
+    :root { --max-board: 480px; }
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 0; padding: 16px; color: #111; }
+    header { text-align: center; margin-bottom: 12px; }
+    .wrap {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      max-width: 1000px;
+      margin: 0 auto;
+      align-items: start;
+    }
+    @media (min-width: 900px) {
+      .wrap { grid-template-columns: 300px 1fr; }
+    }
+    #naniCard {
+      text-align: center;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    #naniImg {
+      width: 100%;
+      max-width: 260px;
+      height: auto;
+      border-radius: 12px;
+      display: block;
+      margin: 0 auto 8px;
+      background: #f5f5f5;
+    }
+    .btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+    button {
+      cursor: pointer; border: 1px solid #ddd; border-radius: 999px; padding: 8px 14px; background: #fff;
+    }
+    button.active { background: #111; color: #fff; border-color: #111; }
+    #boardWrap { display: grid; gap: 8px; justify-items: center; }
+    #board {
+      width: min(90vw, var(--max-board));
+      max-width: var(--max-board);
+      margin: 0 auto;
+    }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .pill { padding: 6px 10px; border-radius: 999px; background: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>Chess vs Nani</h2>
+    <div class="pill">Current mode: <strong id="modeLabel">Sleeping Nani</strong></div>
+  </header>
+
+  <div class="wrap">
+    <aside id="naniCard">
+      <img id="naniImg" alt="Nani" src="/static/images/sleeping.png" />
+      <div class="btns">
+        <button id="btn-sleeping" class="active" onclick="choose('sleeping')">💤 Sleeping Nani</button>
+        <button id="btn-blindfold" onclick="choose('blindfold')">🙈 Blindfold Nani</button>
+        <button id="btn-nani" onclick="choose('nani')">🔥 Nani</button>
+      </div>
+    </aside>
+
+    <main id="boardWrap">
+      <div id="board"></div>
+      <div class="row">
+        <button onclick="restart()">↺ Restart</button>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboardjs/1.0.0/chessboard-1.0.0.min.js"></script>
+
+  <script>
+    var boardUI = null;
+    var game = new Chess();
+    var currentMode = 'sleeping';
+
+    function updateButtons() {
+      document.getElementById('btn-sleeping').classList.toggle('active', currentMode === 'sleeping');
+      document.getElementById('btn-blindfold').classList.toggle('active', currentMode === 'blindfold');
+      document.getElementById('btn-nani').classList.toggle('active', currentMode === 'nani');
+      const labelMap = { sleeping: 'Sleeping Nani', blindfold: 'Blindfold Nani', nani: 'Nani' };
+      document.getElementById('modeLabel').textContent = labelMap[currentMode];
+      const srcMap = {
+        sleeping: '/static/images/sleeping.png',
+        blindfold: '/static/images/blindfold.png',
+        nani: '/static/images/nani.png'
+      };
+      document.getElementById('naniImg').src = srcMap[currentMode];
+    }
+
+    function choose(state) {
+      fetch('/set_difficulty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state })
+      }).then(r => r.json()).then(res => {
+        if (res.ok) {
+          currentMode = res.state;
+          game.load(res.fen);
+          boardUI.position(res.fen);
+          updateButtons();
+        } else {
+          alert(res.error || 'Failed to set difficulty');
+        }
+      }).catch(err => alert(err));
+    }
+
+    function makeMove(source, target) {
+      var move = source + target;
+      $.ajax({
+        type: "POST",
+        url: "/move",
+        contentType: "application/json",
+        data: JSON.stringify({ move: move }),
+        success: function(res) {
+          if (res.fen) {
+            game.load(res.fen);
+            boardUI.position(res.fen);
+          } else {
+            alert(res.error || "Illegal move");
+            boardUI.position(game.fen());
+          }
+        }
+      });
+    }
+
+    function onDrop(source, target) {
+      makeMove(source, target);
+    }
+
+    function restart() {
+      choose(currentMode); // re-sends current mode to reset board
+    }
+
+    function initBoard() {
+      $.getJSON("/get_fen", function(data) {
+        game.load(data.fen);
+        boardUI = Chessboard('board', {
+          draggable: true,
+          position: data.fen,
+          onDrop: onDrop
+        });
+        updateButtons();
+      });
+    }
+
+    $(initBoard);
+  </script>
+</body>
+</html>
+

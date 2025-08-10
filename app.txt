@@ -1,0 +1,79 @@
+from flask import Flask, render_template, request, jsonify
+import chess
+from stockfish import Stockfish
+
+app = Flask(__name__)
+
+# --- Engine & board setup ---
+board = chess.Board()
+stockfish = Stockfish(path="/opt/homebrew/bin/stockfish")  # <- your path is correct
+
+def set_nani(state: str):
+    """Configure Stockfish strength based on Nani's state."""
+    stockfish.set_fen_position(board.fen())
+    state = (state or "").lower().strip()
+
+    if state == "sleeping":
+        # ~400 elo
+        stockfish.set_skill_level(1)  # 0-20
+        try:
+            stockfish.set_elo_rating(400)
+        except Exception:
+            pass
+    elif state == "blindfold":
+        # ~1200 elo
+        stockfish.set_skill_level(6)
+        try:
+            stockfish.set_elo_rating(1200)
+        except Exception:
+            pass
+    else:
+        # "nani" = max strength
+        stockfish.set_skill_level(20)
+        # no elo cap
+
+# default difficulty when server starts
+set_nani("sleeping")
+
+# --- Routes ---
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/get_fen")
+def get_fen():
+    return jsonify({"fen": board.fen()})
+
+@app.route("/set_difficulty", methods=["POST"])
+def set_difficulty():
+    global board
+    data = request.json or {}
+    state = (data.get("state") or "").lower().strip()
+
+    if state not in {"sleeping", "blindfold", "nani"}:
+        return jsonify({"error": "Invalid state. Use sleeping, blindfold, or nani."}), 400
+
+    board = chess.Board()   # reset game on switch
+    set_nani(state)
+    return jsonify({"ok": True, "fen": board.fen(), "state": state})
+
+@app.route("/move", methods=["POST"])
+def move():
+    data = request.json or {}
+    try:
+        uci_move = data["move"]
+        mv = chess.Move.from_uci(uci_move)
+        if mv in board.legal_moves:
+            board.push(mv)
+            stockfish.set_fen_position(board.fen())
+            ai_move = stockfish.get_best_move()
+            if ai_move:
+                board.push(chess.Move.from_uci(ai_move))
+            return jsonify({"fen": board.fen()})
+        else:
+            return jsonify({"error": "Illegal move"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+if __name__ == "__main__":
+    app.run(debug=True)
