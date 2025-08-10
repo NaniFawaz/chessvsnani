@@ -7,7 +7,8 @@ app = Flask(__name__)
 # --- Engine & board setup ---
 board = chess.Board()
 # On your Mac, Homebrew path worked. On Render, we install system stockfish and call it from PATH:
-stockfish = Stockfish(path="stockfish")
+stockfish = Stockfish(path="/usr/games/stockfish")
+
 
 def set_nani(state: str):
     """Configure Stockfish strength based on Nani's state."""
