@@ -1,24 +1,27 @@
 from flask import Flask, render_template, request, jsonify
 import chess
 from stockfish import Stockfish
+import shutil
 
 app = Flask(__name__)
 
 # --- Engine & board setup ---
 board = chess.Board()
-# On your Mac, Homebrew path worked. On Render, we install system stockfish and call it from PATH:
-stockfish = Stockfish(path="/usr/games/stockfish")
 
+# Auto-detect Stockfish path (works on your Mac & on Render Docker)
+sf_path = shutil.which("stockfish") or "/usr/games/stockfish"
+stockfish = Stockfish(path=sf_path, parameters={"Threads": 1, "Hash": 16})
 
 def set_nani(state: str):
     """Configure Stockfish strength based on Nani's state."""
-    state = (state or "").lower().strip()
+    s = (state or "").lower().strip()
     stockfish.set_fen_position(board.fen())
-    if state == "sleeping":
+
+    if s == "sleeping":
         stockfish.set_skill_level(1)
         try: stockfish.set_elo_rating(400)
         except Exception: pass
-    elif state == "blindfold":
+    elif s == "blindfold":
         stockfish.set_skill_level(8)
         try: stockfish.set_elo_rating(1200)
         except Exception: pass
@@ -46,18 +49,20 @@ def set_difficulty():
     if state not in {"sleeping", "blindfold", "nani"}:
         return jsonify({"error": "Invalid state"}), 400
     current_state = state
-    board = chess.Board()  # reset game on switch
+    board = chess.Board()  # reset on switch
     set_nani(current_state)
     return jsonify({"ok": True, "state": current_state, "fen": board.fen()})
 
 @app.route("/move", methods=["POST"])
 def move():
+    """Apply human move, then engine reply. Fast per-mode think time."""
+    global board, current_state
     data = request.get_json(silent=True) or {}
     uci = (data.get("move") or "").strip()
     if len(uci) < 4:
         return jsonify({"error": "Bad move"}), 400
 
-    # Human move
+    # Parse player's move
     try:
         human_move = chess.Move.from_uci(uci[:4])
     except Exception:
@@ -65,12 +70,22 @@ def move():
     if human_move not in board.legal_moves:
         return jsonify({"error": "Illegal move"}), 400
 
+    # Push human move
     board.push(human_move)
 
-    # Engine reply (if game not over)
+    # Engine move (if game not over)
     if not board.is_game_over():
         stockfish.set_fen_position(board.fen())
-        best = stockfish.get_best_move()
+
+        # Fast think times (milliseconds)
+        per_mode_ms = {"sleeping": 120, "blindfold": 300, "nani": 800}
+        ms = per_mode_ms.get(current_state, 300)
+
+        try:
+            best = stockfish.get_best_move_time(ms)
+        except Exception:
+            best = stockfish.get_best_move()
+
         if best:
             try:
                 engine_move = chess.Move.from_uci(best)
@@ -82,5 +97,5 @@ def move():
     return jsonify({"fen": board.fen()})
 
 if __name__ == "__main__":
-    # Local run (Render will use gunicorn app:app so this block won't run there)
+    # Local dev (Docker/Render uses gunicorn app:app)
     app.run(host="0.0.0.0", port=5000, debug=True)
