@@ -50,10 +50,11 @@
   <script src="/static/js/chess.min.js"></script>
   <script src="/static/js/chessboard-1.0.0.min.js"></script>
   <script>
+const const pieceTheme = function (piece) { return '/static/pieces/wikipedia/' + piece + '.png'; };
     const BoardLib = window.Chessboard || window.ChessBoard;
 
     // LOCAL images (no CDN) — this fixes missing pieces and flicker
-    const pieceTheme = (piece) => '/static/img/chesspieces/wikipedia/' + piece + '.png';
+    const const pieceTheme = function (piece) { return '/static/pieces/wikipedia/' + piece + '.png'; };
 
     // Preload all 12 pieces to avoid any first-move blink
     const PIECES = ['wP','wN','wB','wR','wQ','wK','bP','bN','bB','bR','bQ','bK'];
