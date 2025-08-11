@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chess vs Nani</title>
+  <link rel="stylesheet" href="/static/css/chessboard-1.0.0.min.css" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f5f6f8;margin:0;padding:24px;}
+    h1{margin:0 0 16px;}
+    #board{width: 480px; max-width: 92vw; margin-top: 8px;}
+    .controls{margin-top:12px}
+  </style>
+</head>
+<body>
+  <h1>Chess vs Nani</h1>
+  <div id="board"></div>
+  <div class="controls"><button id="btn-restart">↻ Restart</button></div>
+
+  <script src="/static/js/jquery-3.6.0.min.js"></script>
+  <script src="/static/js/chess.min.js"></script>
+  <script src="/static/js/chessboard-1.0.0.min.js"></script>
+  <script>
+    // Use your local piece images
+    const pieceTheme = (piece) => '/static/pieces/wikipedia/' + piece + '.png';
+
+    // Create a board + local game just to render pieces
+    const game = new Chess();
+    const board = Chessboard('board', {
+      position: 'start',
+      draggable: true,
+      pieceTheme: pieceTheme,
+      onDrop: (source, target) => {
+        const move = game.move({from: source, to: target, promotion: 'q'});
+        if (!move) return 'snapback';
+      }
+    });
+
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      game.reset();
+      board.start();
+    });
+  </script>
+</body>
+</html>
