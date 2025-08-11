@@ -1,153 +1,186 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Chess vs Nani</title>
-  <link rel="stylesheet" href="/static/css/chessboard-1.0.0.min.css?v=9" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+  <link rel="stylesheet" href="/static/css/chessboard-1.0.0.min.css" />
   <style>
-    :root { --max-board: 480px; }
-    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 0; padding: 16px; color: #111; }
-    header { text-align: center; margin-bottom: 12px; }
-    .wrap { display: grid; grid-template-columns: 1fr; gap: 16px; max-width: 1000px; margin: 0 auto; align-items: start; }
-    @media (min-width: 900px) { .wrap { grid-template-columns: 300px 1fr; } }
-    #naniCard { text-align: center; border: 1px solid #eee; border-radius: 12px; padding: 12px; }
-    #naniImg { width: 100%; max-width: 260px; height: auto; border-radius: 12px; display: block; margin: 0 auto 8px; background: #f5f5f5; }
-    .btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
-    button { cursor: pointer; border: 1px solid #ddd; border-radius: 999px; padding: 8px 14px; background: #fff; }
-    button.active { background: #111; color: #fff; border-color: #111; }
-    #boardWrap { display: grid; gap: 8px; justify-items: center; }
-    #board { width: min(90vw, var(--max-board)); max-width: var(--max-board); margin: 0 auto; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-    .pill { padding: 6px 10px; border-radius: 999px; background: #f2f2f2; }
+    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f7f7f8; color:#111; margin:0}
+    header{max-width:960px;margin:20px auto 8px;padding:0 16px}
+    h1{margin:8px 0 6px;font-size:28px}
+    #modeLine{background:#eee;border-radius:10px;padding:8px 12px;display:inline-block}
+    main{max-width:960px;margin:12px auto 40px;display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:0 16px}
+    .panel{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:14px}
+    #naniBox img{width:100%;border-radius:10px;display:block;user-select:none;-webkit-user-drag:none}
+    #buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    button{border:0;border-radius:999px;padding:8px 14px;background:#eee;cursor:pointer}
+    button.active{background:#111;color:#fff}
+    #board{max-width:520px;width:92vw;margin:12px auto}
+    .square-55d63{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+    img{-webkit-user-drag:none}
+    .bar{display:flex;justify-content:center;margin-top:10px}
+    .bar button{background:#e9e9ea}
+    @media (max-width: 900px){ main{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
   <header>
-    <h2>Chess vs Nani</h2>
-    <div class="pill">Current mode: <strong id="modeLabel">Sleeping Nani</strong></div>
+    <h1>Chess vs Nani</h1>
+    <div id="modeLine">Current mode: <b id="modeName">Sleeping Nani</b></div>
   </header>
 
-  <div class="wrap">
-    <aside id="naniCard">
-      <img id="naniImg" alt="Nani" src="/static/images/sleeping.png" />
-      <div class="btns">
-        <button id="btn-sleeping" class="active" onclick="choose('sleeping')">💤 Sleeping Nani</button>
-        <button id="btn-blindfold" onclick="choose('blindfold')">🙈 Blindfold Nani</button>
-        <button id="btn-nani" onclick="choose('nani')">🔥 Nani</button>
+  <main>
+    <div class="panel" id="naniBox">
+      <img id="naniImg" src="/static/images/sleeping.png" alt="Nani" />
+      <div id="buttons">
+        <button id="btn-sleeping" class="active">😴 Sleeping Nani</button>
+        <button id="btn-blindfold">🕶️ Blindfold Nani</button>
+        <button id="btn-nani">🔥 Nani</button>
       </div>
-    </aside>
+    </div>
 
-    <main id="boardWrap">
+    <div class="panel">
       <div id="board"></div>
-      <div class="row"><button onclick="restart()">↺ Restart</button></div>
-    </main>
-  </div>
+      <div class="bar"><button id="btn-restart">↺ Restart</button></div>
+    </div>
+  </main>
 
-  <!-- Order: jQuery -> chess.js (UMD) -> chessboard.js -->
-  <script src="/static/js/jquery-3.6.0.min.js?v=9"></script>
-  <script src="/static/js/chess.min.js?v=9"></script>
-  <script src="/static/js/chessboard-1.0.0.min.js?v=9"></script>
-
+  <script src="/static/js/jquery-3.6.0.min.js"></script>
+  <script src="/static/js/chess.min.js"></script>
+  <script src="/static/js/chessboard-1.0.0.min.js"></script>
   <script>
-    let boardUI = null;
+    // Support either global: Chessboard (1.0) or ChessBoard (older)
+    const BoardLib = window.Chessboard || window.ChessBoard;
+
+    // Reliable piece images from CDN (cached)
+    const pieceTheme = (piece) =>
+      `https://cdn.jsdelivr.net/gh/oakmac/chessboardjs@1.0.0/www/img/chesspieces/wikipedia/${piece}.png`;
+
+    // Preload all 12 pieces to avoid flicker
+    const PIECES = ['wP','wN','wB','wR','wQ','wK','bP','bN','bB','bR','bQ','bK'];
+    function preloadPieces(done){
+      let left = PIECES.length;
+      PIECES.forEach(code=>{
+        const img = new Image();
+        img.onload = img.onerror = () => { left--; if(left===0 && typeof done==='function') done(); };
+        img.src = pieceTheme(code);
+      });
+    }
+
+    // UI state
     let game = null;
+    let boardUI = null;
     let currentMode = 'sleeping';
     let initialized = false;
 
-    function updateButtons() {
-      document.getElementById('btn-sleeping').classList.toggle('active', currentMode === 'sleeping');
-      document.getElementById('btn-blindfold').classList.toggle('active', currentMode === 'blindfold');
-      document.getElementById('btn-nani').classList.toggle('active', currentMode === 'nani');
-      const label = { sleeping: 'Sleeping Nani', blindfold: 'Blindfold Nani', nani: 'Nani' };
-      document.getElementById('modeLabel').textContent = label[currentMode];
-      const img = {
-        sleeping: '/static/images/sleeping.png',
-        blindfold: '/static/images/blindfold.png',
-        nani: '/static/images/nani.png'
-      };
-      document.getElementById('naniImg').src = img[currentMode];
+    function setNaniImage(){
+      const map = { sleeping: '/static/images/sleeping.png',
+                    blindfold: '/static/images/blindfold.png',
+                    nani: '/static/images/nani.png' };
+      document.getElementById('naniImg').src = map[currentMode] || map.sleeping;
+      document.getElementById('modeName').textContent =
+        currentMode==='sleeping' ? 'Sleeping Nani' :
+        currentMode==='blindfold' ? 'Blindfold Nani' : 'Nani';
+    }
+    function updateButtons(){
+      ['sleeping','blindfold','nani'].forEach(s=>{
+        document.getElementById('btn-'+s).classList.toggle('active', s===currentMode);
+      });
     }
 
-    function choose(state) {
-      if (!initialized) { alert('Board is loading…'); return; }
-      fetch('/set_difficulty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state })
+    async function choose(state){
+      if(!initialized){ alert('Board is loading…'); return; }
+      try{
+        const r = await fetch('/set_difficulty', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({state})
+        });
+        const res = await r.json();
+        if(res.ok){
+          currentMode = res.state;
+          game.load(res.fen);
+          // No animation -> no flicker
+          boardUI.position(game.fen(), false);
+          setNaniImage(); updateButtons();
+        }else{
+          alert(res.error || 'Failed to set difficulty');
+        }
+      }catch(e){ alert("Couldn't contact the server. Is it running?"); }
+    }
+
+    function onDrop(source, target){
+      if(!initialized || !game) return 'snapback';
+
+      // Build UCI + auto-queen promotions
+      const isPromotion = (sqFrom, sqTo, piece) => {
+        if (piece === 'wP' && sqTo.endsWith('8')) return true;
+        if (piece === 'bP' && sqTo.endsWith('1')) return true;
+        return false;
+      };
+      const piece = game.get(source);
+      const promo = piece && isPromotion(source, target, (piece.color==='w'?'w':'b')+piece.type.toUpperCase()) ? 'q' : '';
+      const uci = source + target + promo;
+
+      // Optimistic local move to keep UI snappy
+      const moveObj = { from: source, to: target, promotion: promo || 'q' };
+      const test = game.move(moveObj);
+      if(!test){ return 'snapback'; }
+
+      // Update UI instantly without animation (prevents flicker)
+      boardUI.position(game.fen(), false);
+
+      // Send to server; server replies with new FEN after engine move
+      fetch('/move', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ move: uci })
       })
       .then(r => r.json())
       .then(res => {
-        if (res.ok) {
-          currentMode = res.state;
-          if (!game) game = new Chess();
+        if(res.fen){
           game.load(res.fen);
-          boardUI.position(res.fen);
-          updateButtons();
-        } else {
-          alert(res.error || 'Failed to set difficulty');
+          boardUI.position(game.fen(), false);
+        }else{
+          // Server rejected -> revert board
+          game.undo();
+          boardUI.position(game.fen(), false);
         }
       })
-      .catch(() => alert('Network error'));
-    }
-
-    // NEW: pre-check legality locally; only POST legal moves. Send "move": "e2e4" to backend.
-    function makeMove(source, target) {
-      if (!initialized || !game) return 'snapback';
-
-      // Try move in a temp game from current FEN
-      const tmp = new Chess(game.fen());
-      const tried = tmp.move({ from: source, to: target, promotion: 'q' });
-      if (!tried) return 'snapback'; // illegal → snap back, no network call
-
-      $.ajax({
-        type: 'POST',
-        url: '/move',
-        contentType: 'application/json',
-        data: JSON.stringify({ move: source + target }),
-        success: function(res) {
-          if (res.fen) {
-            game.load(res.fen);
-            boardUI.position(res.fen);
-          } else {
-            boardUI.position(game.fen());
-          }
-        },
-        error: function() {
-          boardUI.position(game.fen());
-        }
+      .catch(() => {
+        game.undo();
+        boardUI.position(game.fen(), false);
       });
+
+      // Tell chessboard.js we handled the drop
+      return 'snapback';
     }
 
-    function onDrop(source, target) {
-      return makeMove(source, target);
+    function initBoard(){
+      fetch('/get_fen')
+        .then(r=>r.json())
+        .then(data=>{
+          game = new Chess(data.fen || undefined);
+          boardUI = BoardLib('board', {
+            draggable: true,
+            position: game.fen(),
+            pieceTheme: pieceTheme,
+            onDrop: onDrop
+          });
+          initialized = true;
+          setNaniImage(); updateButtons();
+        })
+        .catch(()=> alert("Couldn't contact the server. Is it running?"));
     }
 
-    function restart() {
-      if (initialized) choose(currentMode);
-    }
+    // Buttons
+    document.getElementById('btn-sleeping').onclick = () => choose('sleeping');
+    document.getElementById('btn-blindfold').onclick = () => choose('blindfold');
+    document.getElementById('btn-nani').onclick = () => choose('nani');
+    document.getElementById('btn-restart').onclick = () => choose(currentMode);
 
-    function initBoard() {
-      $.getJSON('/get_fen', function(data) {
-        if (typeof Chess === 'undefined') { alert('chess.js missing'); return; }
-        if (typeof Chessboard === 'undefined') { alert('chessboard.js missing'); return; }
-        game = new Chess();
-        game.load(data.fen);
-        boardUI = Chessboard('board', {
-          draggable: true,
-          position: data.fen,
-          onDrop: onDrop,
-          pieceTheme: '/static/pieces/wikipedia/{piece}.png'
-        });
-        initialized = true;
-        updateButtons();
-      }).fail(function() {
-        alert('Server not reachable');
-      });
-    }
-
-    if (typeof $ !== 'undefined') { $(initBoard); }
-    else { window.addEventListener('load', initBoard); }
+    // Start: preload images first, then init board
+    preloadPieces(initBoard);
   </script>
 </body>
 </html>
