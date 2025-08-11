@@ -54,9 +54,8 @@
     // Support either global: Chessboard (1.0) or ChessBoard (older)
     const BoardLib = window.Chessboard || window.ChessBoard;
 
-    // Reliable piece images from CDN (cached)
-    const pieceTheme = (piece) =>
-      `https://cdn.jsdelivr.net/gh/oakmac/chessboardjs@1.0.0/www/img/chesspieces/wikipedia/${piece}.png`;
+    // Reliable piece images from CDN (cached) 
+       const pieceTheme = (piece) => `/static/img/chesspieces/wikipedia/${piece}.png`;
 
     // Preload all 12 pieces to avoid flicker
     const PIECES = ['wP','wN','wB','wR','wQ','wK','bP','bN','bB','bR','bQ','bK'];
