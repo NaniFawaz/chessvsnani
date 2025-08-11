@@ -4,16 +4,15 @@
   <meta charset="utf-8" />
   <title>Chess vs Nani</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
   <link rel="stylesheet" href="/static/css/chessboard-1.0.0.min.css" />
   <style>
-    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f7f7f8; color:#111; margin:0}
-    header{max-width:960px;margin:20px auto 8px;padding:0 16px}
-    h1{margin:8px 0 6px;font-size:28px}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f7f7f8;margin:0;color:#111}
+    header{max-width:960px;margin:18px auto 8px;padding:0 16px}
+    h1{margin:0 0 6px;font-size:28px}
     #modeLine{background:#eee;border-radius:10px;padding:8px 12px;display:inline-block}
     main{max-width:960px;margin:12px auto 40px;display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:0 16px}
     .panel{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:14px}
-    #naniBox img{width:100%;border-radius:10px;display:block;user-select:none;-webkit-user-drag:none}
+    #naniBox img{width:100%;border-radius:10px;display:block;-webkit-user-drag:none;user-select:none}
     #buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
     button{border:0;border-radius:999px;padding:8px 14px;background:#eee;cursor:pointer}
     button.active{background:#111;color:#fff}
@@ -51,37 +50,32 @@
   <script src="/static/js/chess.min.js"></script>
   <script src="/static/js/chessboard-1.0.0.min.js"></script>
   <script>
-    // Support either global: Chessboard (1.0) or ChessBoard (older)
     const BoardLib = window.Chessboard || window.ChessBoard;
 
-    // Reliable piece images from CDN (cached) 
-       const pieceTheme = (piece) => `/static/img/chesspieces/wikipedia/${piece}.png`;
+    // LOCAL images (no CDN) — this fixes missing pieces and flicker
+    const pieceTheme = (piece) => '/static/img/chesspieces/wikipedia/' + piece + '.png';
 
-    // Preload all 12 pieces to avoid flicker
+    // Preload all 12 pieces to avoid any first-move blink
     const PIECES = ['wP','wN','wB','wR','wQ','wK','bP','bN','bB','bR','bQ','bK'];
     function preloadPieces(done){
       let left = PIECES.length;
       PIECES.forEach(code=>{
         const img = new Image();
-        img.onload = img.onerror = () => { left--; if(left===0 && typeof done==='function') done(); };
+        img.onload = img.onerror = () => { if(--left===0 && typeof done==='function') done(); };
         img.src = pieceTheme(code);
       });
     }
 
-    // UI state
-    let game = null;
-    let boardUI = null;
-    let currentMode = 'sleeping';
-    let initialized = false;
+    let game=null, boardUI=null, currentMode='sleeping', initialized=false;
 
     function setNaniImage(){
-      const map = { sleeping: '/static/images/sleeping.png',
-                    blindfold: '/static/images/blindfold.png',
-                    nani: '/static/images/nani.png' };
+      const map={ sleeping:'/static/images/sleeping.png',
+                  blindfold:'/static/images/blindfold.png',
+                  nani:'/static/images/nani.png' };
       document.getElementById('naniImg').src = map[currentMode] || map.sleeping;
       document.getElementById('modeName').textContent =
-        currentMode==='sleeping' ? 'Sleeping Nani' :
-        currentMode==='blindfold' ? 'Blindfold Nani' : 'Nani';
+        currentMode==='sleeping'?'Sleeping Nani':
+        currentMode==='blindfold'?'Blindfold Nani':'Nani';
     }
     function updateButtons(){
       ['sleeping','blindfold','nani'].forEach(s=>{
@@ -92,93 +86,58 @@
     async function choose(state){
       if(!initialized){ alert('Board is loading…'); return; }
       try{
-        const r = await fetch('/set_difficulty', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({state})
-        });
+        const r = await fetch('/set_difficulty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state})});
         const res = await r.json();
         if(res.ok){
           currentMode = res.state;
           game.load(res.fen);
-          // No animation -> no flicker
-          boardUI.position(game.fen(), false);
+          boardUI.position(game.fen(), false); // no animation = no flicker
           setNaniImage(); updateButtons();
-        }else{
-          alert(res.error || 'Failed to set difficulty');
-        }
-      }catch(e){ alert("Couldn't contact the server. Is it running?"); }
+        } else alert(res.error||'Failed to set difficulty');
+      }catch{ alert("Couldn't contact the server."); }
     }
 
-    function onDrop(source, target){
-      if(!initialized || !game) return 'snapback';
+    function onDrop(source,target){
+      if(!initialized||!game) return 'snapback';
+      const p = game.get(source);
+      const promo = (p && ((p.color==='w' && target.endsWith('8')) || (p.color==='b' && target.endsWith('1')))) ? 'q' : '';
+      const uci = source+target+promo;
 
-      // Build UCI + auto-queen promotions
-      const isPromotion = (sqFrom, sqTo, piece) => {
-        if (piece === 'wP' && sqTo.endsWith('8')) return true;
-        if (piece === 'bP' && sqTo.endsWith('1')) return true;
-        return false;
-      };
-      const piece = game.get(source);
-      const promo = piece && isPromotion(source, target, (piece.color==='w'?'w':'b')+piece.type.toUpperCase()) ? 'q' : '';
-      const uci = source + target + promo;
+      const test = game.move({from:source,to:target,promotion:promo||'q'});
+      if(!test) return 'snapback';
 
-      // Optimistic local move to keep UI snappy
-      const moveObj = { from: source, to: target, promotion: promo || 'q' };
-      const test = game.move(moveObj);
-      if(!test){ return 'snapback'; }
+      boardUI.position(game.fen(), false); // instant update
 
-      // Update UI instantly without animation (prevents flicker)
-      boardUI.position(game.fen(), false);
+      fetch('/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({move:uci})})
+        .then(r=>r.json())
+        .then(res=>{
+          if(res.fen){ game.load(res.fen); boardUI.position(game.fen(), false); }
+          else { game.undo(); boardUI.position(game.fen(), false); }
+        })
+        .catch(()=>{ game.undo(); boardUI.position(game.fen(), false); });
 
-      // Send to server; server replies with new FEN after engine move
-      fetch('/move', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ move: uci })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if(res.fen){
-          game.load(res.fen);
-          boardUI.position(game.fen(), false);
-        }else{
-          // Server rejected -> revert board
-          game.undo();
-          boardUI.position(game.fen(), false);
-        }
-      })
-      .catch(() => {
-        game.undo();
-        boardUI.position(game.fen(), false);
-      });
-
-      // Tell chessboard.js we handled the drop
       return 'snapback';
     }
 
     function initBoard(){
-      fetch('/get_fen')
-        .then(r=>r.json())
-        .then(data=>{
-          game = new Chess(data.fen || undefined);
-          boardUI = BoardLib('board', {
-            draggable: true,
-            position: game.fen(),
-            pieceTheme: pieceTheme,
-            onDrop: onDrop
-          });
-          initialized = true;
-          setNaniImage(); updateButtons();
-        })
-        .catch(()=> alert("Couldn't contact the server. Is it running?"));
+      fetch('/get_fen').then(r=>r.json()).then(data=>{
+        game = new Chess(data.fen || undefined);
+        boardUI = BoardLib('board', {
+          draggable:true,
+          position:game.fen(),
+          pieceTheme:pieceTheme,
+          onDrop:onDrop
+        });
+        initialized=true;
+        setNaniImage(); updateButtons();
+      }).catch(()=>alert("Couldn't contact the server."));
     }
 
-    // Buttons
-    document.getElementById('btn-sleeping').onclick = () => choose('sleeping');
-    document.getElementById('btn-blindfold').onclick = () => choose('blindfold');
-    document.getElementById('btn-nani').onclick = () => choose('nani');
-    document.getElementById('btn-restart').onclick = () => choose(currentMode);
+    document.getElementById('btn-sleeping').onclick = ()=>choose('sleeping');
+    document.getElementById('btn-blindfold').onclick = ()=>choose('blindfold');
+    document.getElementById('btn-nani').onclick = ()=>choose('nani');
+    document.getElementById('btn-restart').onclick = ()=>choose(currentMode);
 
-    // Start: preload images first, then init board
     preloadPieces(initBoard);
   </script>
 </body>
