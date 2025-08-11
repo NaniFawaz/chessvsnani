@@ -4,167 +4,201 @@
   <meta charset="utf-8" />
   <title>Chess vs Nani</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Local CSS/JS we already put in static -->
   <link rel="stylesheet" href="/static/css/chessboard-1.0.0.min.css" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
-    h1 { margin: 0 0 16px; }
-    #board { width: 420px; max-width: 90vw; }
-    .panel { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
-    /* stop mobile page scroll while dragging */
-    #board { touch-action: none; }
-    body { overscroll-behavior: contain; }
-    /* no animation flicker on piece image swap */
-    .chessboard-clearfix img { transition: none !important; animation: none !important; }
-    .bar { margin-top: 10px; }
-    button { border: 1px solid #ccc; background: #f7f7f7; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
-    button:active { transform: translateY(1px); }
-    .mode { font-weight: 600; margin: 0 0 8px; }
+    :root{--card:#fff;--text:#1f2328;--muted:#6b7280;--border:#e5e7eb;--btn:#f5f5f7;--accent:#111827;--warn:#ef4444;--blue:#3b82f6;--green:#22c55e}
+    html,body{height:100%}
+    body{
+      margin:0;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:radial-gradient(1200px 600px at 20% -10%,#f6f7fb 40%,#e9ecf7 100%),linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%);
+      overflow-x:hidden;
+    }
+    .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+    h1{margin:0 0 8px}
+    .sub{margin:0 0 18px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:340px 1fr;gap:24px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr} #left{order:-1}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.06);padding:20px}
+    #nimg{width:100%;border-radius:14px;display:block;user-select:none;-webkit-user-drag:none}
+    .modes{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .modes button{border:1px solid var(--border);background:var(--btn);padding:8px 12px;border-radius:999px;cursor:pointer}
+    .modes button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    #board{width:520px;max-width:92vw;touch-action:none}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center}
+    .toolbar .sp{flex:1}
+    button{border:1px solid var(--border);background:var(--btn);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+    button:hover{transform:translateY(-1px)}
+    /* highlights */
+    .square.hl-from{box-shadow:inset 0 0 0 3px rgba(34,197,94,.9)}
+    .square.hl-to{box-shadow:inset 0 0 0 3px rgba(59,130,246,.95)}
+    .square.hl-check{box-shadow:inset 0 0 0 3px rgba(239,68,68,.95)}
+    .chessboard-clearfix img{transition:none!important;animation:none!important}
+    /* banners */
+    .badge{display:none;margin-top:10px;padding:6px 10px;border-radius:999px;font-weight:700}
+    .badge.show{display:inline-block}
+    .badge.warn{background:#fee2e2;color:#9f1239;border:1px solid #fecaca}
+    /* overlay */
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:9999}
+    .overlay.show{display:flex}
+    .dlg{background:#fff;border-radius:14px;padding:18px 18px 14px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center;max-width:420px}
+    .dlg h2{margin:0 0 8px}
   </style>
 </head>
 <body>
-  <h1>Chess vs Nani</h1>
-  <div class="mode">Current mode: <span id="mode-label">Sleeping Nani</span></div>
+  <div class="wrap">
+    <h1>Chess vs Nani</h1>
+    <p class="sub">Current mode: <b id="modeLabel">Sleeping Nani</b> <span id="checkBadge" class="badge warn">CHECK</span></p>
 
-  <div class="panel">
-    <div>
-      <div id="board"></div>
-      <div class="bar"><button id="btn-restart">⟲ Restart</button></div>
-      <div class="bar">
-        <button id="btn-sleep">😴 Sleeping Nani</button>
-        <button id="btn-blind">🙈 Blindfold Nani</button>
-        <button id="btn-nani">🔥 Nani</button>
+    <div class="card">
+      <div class="grid">
+        <section id="left">
+          <img id="nimg" src="/static/images/sleeping.png" alt="Nani" />
+          <div class="modes">
+            <button id="m-sleep" class="active">😴 Sleeping Nani</button>
+            <button id="m-blind">🙈 Blindfold Nani</button>
+            <button id="m-nani">🔥 Nani</button>
+          </div>
+        </section>
+
+        <section>
+          <div id="board"></div>
+          <div class="toolbar">
+            <button id="btn-restart">⟲ Restart</button>
+            <div class="sp"></div>
+            <button id="btn-undo">↶ Undo</button>
+            <button id="btn-redo">↷ Redo</button>
+            <button id="btn-review">👀 Review</button>
+            <button id="btn-pgn">⬇️ PGN</button>
+          </div>
+          <ol id="moves" style="margin:12px 0 0;padding-left:22px;"></ol>
+        </section>
       </div>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay">
+    <div class="dlg">
+      <h2 id="ov-title">Game Over</h2>
+      <p id="ov-sub" style="color:#6b7280;margin-top:4px">—</p>
+      <div style="margin-top:12px"><button id="ov-again">Play again</button></div>
     </div>
   </div>
 
   <script src="/static/js/jquery-3.6.0.min.js"></script>
   <script src="/static/js/chess.min.js"></script>
   <script src="/static/js/chessboard-1.0.0.min.js"></script>
-
   <script>
-    // -------- globals ----------
-    let game = null;
-    let boardUI = null;
-    let initialized = false;
-    let currentMode = 'sleeping';
+    // pieces from local repo
+    const pieceTheme = (p)=> `/static/pieces/wikipedia/${p}.png`;
+    ['wP','wN','wB','wR','wQ','wK','bP','bN','bB','bR','bQ','bK'].forEach(c=>{ const i=new Image(); i.src=pieceTheme(c); });
 
-    // Use the local piece images in your repo:
-    // (Make sure these 12 PNGs exist in static/pieces/wikipedia/)
-    const pieceTheme = (piece) => `/static/pieces/wikipedia/${piece}.png`;
+    const BoardLib = window.Chessboard || window.ChessBoard;
+    let game=null, boardUI=null, ready=false, currMode='sleeping';
 
-    // Preload 12 images to avoid any flicker
-    (function preloadPieces(){
-      const codes = ['bK','bQ','bR','bB','bN','bP','wK','wQ','wR','wB','wN','wP'];
-      codes.forEach(c => { const i = new Image(); i.src = pieceTheme(c); });
-    })();
+    const $mode = document.getElementById('modeLabel');
+    const $img  = document.getElementById('nimg');
+    const $moves= document.getElementById('moves');
+    const $badge= document.getElementById('checkBadge');
+    const $ov   = document.getElementById('overlay');
+    const $ovT  = document.getElementById('ov-title');
+    const $ovS  = document.getElementById('ov-sub');
 
-    function setModeLabel() {
-      const label = {
-        sleeping: 'Sleeping Nani',
-        blindfold: 'Blindfold Nani',
-        nani: 'Nani'
-      }[currentMode] || 'Sleeping Nani';
-      document.getElementById('mode-label').textContent = label;
-    }
+    const setButtons = (s)=>{
+      currMode = s;
+      document.getElementById('m-sleep').classList.toggle('active', s==='sleeping');
+      document.getElementById('m-blind').classList.toggle('active', s==='blindfold');
+      document.getElementById('m-nani').classList.toggle('active', s==='nani');
+      $mode.textContent = s==='sleeping'?'Sleeping Nani':(s==='blindfold'?'Blindfold Nani':'Nani');
+      $img.src = s==='sleeping'?'/static/images/sleeping.png':(s==='blindfold'?'/static/images/blindfold.png':'/static/images/nani.png');
+    };
 
-    // --- init ---
-    function initBoard(startFen) {
-      game = new Chess(startFen || undefined);
-
-      boardUI = Chessboard('board', {
-        position: game.fen(),
-        draggable: true,
-        pieceTheme,
-        onDrop
+    const sqEl = (sq)=> document.querySelector('.square-'+sq);
+    const clearHL = ()=>{
+      document.querySelectorAll('.square.hl-from,.square.hl-to,.square.hl-check').forEach(el=>{
+        el.classList.remove('hl-from','hl-to','hl-check');
       });
+    };
+    const applyHL = (from,to,checkSq)=>{
+      clearHL();
+      if(from && sqEl(from)) sqEl(from).classList.add('hl-from');
+      if(to && sqEl(to))     sqEl(to).classList.add('hl-to');
+      if(checkSq && sqEl(checkSq)) sqEl(checkSq).classList.add('hl-check');
+    };
 
-      initialized = true;
-      setModeLabel();
-    }
-
-    // --- user drops a piece ---
-    function onDrop(source, target) {
-      if (!initialized || !game) return 'snapback';
-
-      // Try it locally first (so your move appears instantly)
-      const move = game.move({ from: source, to: target, promotion: 'q' });
-      if (!move) return 'snapback';
-
-      // Show your move immediately
-      boardUI.position(game.fen(), true);
-
-      // Ask the server to make Nani's reply and return the new FEN
-      fetch('/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: source, to: target })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res.fen) {
-          game.load(res.fen);
-          boardUI.position(res.fen, true);
-        } else if (res.error) {
-          // rollback if server rejected (rare, but safe)
-          game.undo();
-          boardUI.position(game.fen(), true);
-          alert(res.error);
-        }
-      })
-      .catch(() => {
-        game.undo();
-        boardUI.position(game.fen(), true);
-        alert('Network error');
-      });
-
-      // important: return nothing so drop is accepted
-      return;
-    }
-
-    function restart() {
-      fetch('/restart', { method: 'POST' })
-        .then(r => r.json())
-        .then(res => {
-          game = new Chess(res.fen);
-          boardUI.position(res.fen, true);
+    function updateMovesList(){
+      fetch('/history').then(r=>r.json()).then(h=>{
+        $moves.innerHTML = '';
+        h.moves.forEach((san, i)=>{
+          const li = document.createElement('li');
+          li.textContent = san;
+          li.style.cursor='pointer';
+          li.onclick = ()=>{
+            const fen = h.fens[Math.min(i+1, h.fens.length-1)];
+            boardUI.position(fen, true);
+          };
+          $moves.appendChild(li);
         });
+      });
     }
 
-    function choose(state) {
-      fetch('/set_difficulty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res.ok) {
-          currentMode = state;
-          setModeLabel();
-          game = new Chess(res.fen);
-          boardUI.position(res.fen, true);
-        } else if (res.error) {
-          alert(res.error);
-        }
-      })
-      .catch(() => alert('Network error'));
+    function applyState(res){
+      if(res.fen){ game = new Chess(res.fen); boardUI.position(res.fen, true); }
+      $badge.classList.toggle('show', !!res.in_check);
+      applyHL(res.last_move?.from, res.last_move?.to, res.check_square);
+      if(res.game_over){
+        $ovT.textContent = 'Game Over';
+        $ovS.textContent = res.game_over_reason || 'Finished';
+        $ov.classList.add('show');
+      } else {
+        $ov.classList.remove('show');
+      }
+      updateMovesList();
     }
 
-    // Wire buttons
-    document.addEventListener('DOMContentLoaded', function(){
-      $('#btn-restart').on('click', restart);
-      $('#btn-sleep').on('click', () => choose('sleeping'));
-      $('#btn-blind').on('click', () => choose('blindfold'));
-      $('#btn-nani').on('click', () => choose('nani'));
+    function init(){
+      fetch('/get_fen').then(r=>r.json()).then(res=>{
+        game = new Chess(res.fen || undefined);
+        boardUI = BoardLib('board', { position: game.fen(), draggable:true, pieceTheme, onDrop });
+        window.addEventListener('resize', ()=> boardUI && boardUI.resize());
+        applyState(res);
+        ready=true;
+      }).catch(()=>{
+        game = new Chess();
+        boardUI = BoardLib('board', { position:'start', draggable:true, pieceTheme, onDrop });
+        ready=true;
+      });
+    }
 
-      // Get the starting FEN from server on load
-      fetch('/get_fen')
-        .then(r => r.json())
-        .then(res => initBoard(res.fen))
-        .catch(() => initBoard()); // fallback to the normal start
-    });
+    function onDrop(source, target){
+      if(!ready||!game) return 'snapback';
+      const test = new Chess(game.fen());
+      const mv = test.move({from:source, to:target, promotion:'q'});
+      if(!mv) return 'snapback';
+      game = test;
+      boardUI.position(game.fen(), true);
+      fetch('/move', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({from:source, to:target})})
+      .then(r=>r.json()).then(applyState)
+      .catch(()=>{ /* ignore */ });
+    }
+
+    // buttons
+    document.getElementById('m-sleep').onclick = ()=> fetch('/set_difficulty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:'sleeping'})}).then(r=>r.json()).then(res=>{ setButtons('sleeping'); applyState(res); });
+    document.getElementById('m-blind').onclick = ()=> fetch('/set_difficulty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:'blindfold'})}).then(r=>r.json()).then(res=>{ setButtons('blindfold'); applyState(res); });
+    document.getElementById('m-nani').onclick  = ()=> fetch('/set_difficulty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:'nani'})}).then(r=>r.json()).then(res=>{ setButtons('nani'); applyState(res); });
+
+    document.getElementById('btn-restart').onclick = ()=> fetch('/restart',{method:'POST'}).then(r=>r.json()).then(applyState);
+    document.getElementById('btn-undo').onclick    = ()=> fetch('/undo',{method:'POST'}).then(r=>r.json()).then(applyState);
+    document.getElementById('btn-redo').onclick    = ()=> fetch('/redo',{method:'POST'}).then(r=>r.json()).then(applyState);
+    document.getElementById('btn-pgn').onclick     = async ()=>{
+      const r = await fetch('/pgn'); const pgn = await r.text();
+      const a = document.createElement('a'); a.href=URL.createObjectURL(new Blob([pgn],{type:'text/plain'}));
+      a.download='nani_game.pgn'; a.click(); URL.revokeObjectURL(a.href);
+    };
+    document.getElementById('btn-review').onclick  = updateMovesList;
+    document.getElementById('ov-again').onclick    = ()=> fetch('/restart',{method:'POST'}).then(r=>r.json()).then(applyState);
+
+    window.addEventListener('load', init, {once:true});
   </script>
 </body>
 </html>
