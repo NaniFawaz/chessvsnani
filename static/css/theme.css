@@ -1,0 +1,14 @@
+/* Dark, subtle pattern + better contrast */
+body{
+  background:
+    radial-gradient(1200px 600px at 15% -10%, #0f172a 20%, #0b1220 60%, #0a0f1c 100%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.04) 0 10px, rgba(255,255,255,.02) 10px 20px);
+  color:#e5e7eb;
+}
+.card{ background:#0f172a; border-color:#1f2937; }
+.modes button{ background:#1f2937; color:#e5e7eb; border-color:#374151; }
+.modes button.active{ background:#3b82f6; border-color:#3b82f6; color:#fff; }
+button{ background:#1f2937; color:#e5e7eb; border-color:#374151; }
+.sub{ color:#9ca3af; }
+#modeLabel{ color:#e5e7eb; }
+#moves{ color:#e5e7eb; }
